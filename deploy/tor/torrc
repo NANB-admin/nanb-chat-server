@@ -1,0 +1,41 @@
+# Tor v3 onion service for nanb-server.
+#
+# Place at /etc/tor/torrc on the host (or mount as a sidecar config in docker-compose).
+# After first start, Tor writes the public .onion address to:
+#   /var/lib/tor/nanb/hostname
+# Publish that address in the mobile client so it can reach the server through Tor.
+
+# Standard Tor process settings.
+SocksPort 0
+RunAsDaemon 0
+DataDirectory /var/lib/tor
+
+# Hidden service: forward the onion's port 80 → the server's Tor listener,
+# addressed by its docker-compose service name (resolved via Docker's embedded
+# DNS at 127.0.0.11). Using the service name — NOT 127.0.0.1 — lets tor run on
+# the compose network instead of sharing the server's net namespace, so it
+# survives server-container restarts (the shared-namespace setup silently broke
+# whenever the server restarted and tor kept the dead namespace). The server
+# must bind this listener on a bridge-reachable interface: NANB_TOR_LISTEN_ADDR=
+# 0.0.0.0:8081 (see docker-compose.yml + compose.env.example).
+HiddenServiceDir /var/lib/tor/nanb/
+HiddenServiceVersion 3
+HiddenServicePort 80 server:8081
+
+# Single Onion Service (non-anonymous) mode — a latency optimization.
+# A normal onion service builds a 3-hop circuit from the SERVER to the
+# rendezvous point to hide the server's location; combined with the client's
+# 3-hop circuit that's ~6 hops end-to-end. But this server's location is NOT a
+# secret — it's a public service at a known IP (a known public address), so hiding
+# it buys nothing. Single-hop mode drops the server side to one hop, roughly
+# HALVING onion round-trip latency for every client connection (WS, REST,
+# media). Clients are UNAFFECTED and keep FULL 3-hop anonymity — their real IP
+# is never exposed; only the server side is shortened. The .onion address is
+# unchanged (same key in tor_data), so no client needs to re-pin.
+# Both directives are required together, and require SocksPort 0 (set above);
+# tor refuses non-anonymous mode if it could also act as a normal client.
+HiddenServiceNonAnonymousMode 1
+HiddenServiceSingleHopMode 1
+
+# Logging — to stdout for container-friendliness.
+Log notice stdout

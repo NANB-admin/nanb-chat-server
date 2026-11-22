@@ -1,0 +1,35 @@
+[Unit]
+Description=nanb-server (privacy-focused chat app backend)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nanb
+Group=nanb
+WorkingDirectory=/opt/nanb-server
+ExecStart=/opt/nanb-server/nanb-server
+EnvironmentFile=/etc/nanb-server.env
+Restart=on-failure
+RestartSec=5s
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+
+# Allow reading APNs/FCM secrets and writing nothing else.
+ReadOnlyPaths=/etc/nanb /opt/nanb-server
+
+[Install]
+WantedBy=multi-user.target

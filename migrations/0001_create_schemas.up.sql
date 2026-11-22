@@ -1,0 +1,2 @@
+CREATE SCHEMA IF NOT EXISTS identity_db;
+CREATE SCHEMA IF NOT EXISTS delivery_db;

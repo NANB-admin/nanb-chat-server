@@ -1,0 +1,25 @@
+# Binaries
+/bin/
+/dist/
+nanb-server
+
+# Go test artifacts
+coverage.out
+coverage.html
+*.test
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets
+.env
+.env.local
+# Deploy secrets mounted into the container (Firebase service-account JSON,
+# APNs .p8, etc.) — never commit credential material.
+secrets/
+

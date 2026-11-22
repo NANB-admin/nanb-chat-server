@@ -1,0 +1,106 @@
+# Self-hosting stack for nanb-server: Postgres + migrations + server + Caddy
+# (HTTPS) + optional Tor onion service.
+#
+# Quick start (see SELF_HOSTING.md for the full guide):
+#   cp deploy/compose.env.example .env      # then edit .env
+#   docker compose up -d --build
+#
+# Logs:        docker compose logs -f server
+# Onion addr:  docker compose exec tor cat /var/lib/tor/nanb/hostname
+#
+# State that must survive rebuilds: the postgres_data, tor_data (the .onion
+# key) and caddy_data (TLS certificates) volumes. Back them up.
+#
+# Using a managed Postgres instead? Delete the `postgres` service and the
+# depends_on entry that mentions it, and point NANB_PG_CONN at your database.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nanb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-nanb}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nanb} -d ${POSTGRES_DB:-nanb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-shot: applies the schema migrations, then exits. Idempotent (a no-op
+  # when already current), so it runs on every `up` and gates the server start.
+  migrate:
+    image: migrate/migrate:latest
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations:ro
+    command: ["-path", "/migrations", "-database", "${NANB_PG_CONN}", "up"]
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    # Optional credential files (Firebase service-account JSON, APNs .p8, CDN
+    # signing key). Mounted read-only at /etc/nanb; the NANB_*_PATH variables in
+    # .env point inside it. Absent files just disable that feature.
+    volumes:
+      - ./secrets:/etc/nanb:ro
+    # No published ports: Caddy (HTTPS) and Tor are the only ingress. The Tor
+    # listener (:8081) is reachable only from the internal compose network.
+
+  # Optional Tor v3 onion service in front of the server. Remove this service
+  # (and leave NANB_TOR_LISTEN_ADDR unset) if you do not want one. It runs on the
+  # compose network and reaches the server as `server:8081`. tor_data persists
+  # the .onion key.
+  tor:
+    image: osminogin/tor-simple:latest
+    restart: unless-stopped
+    depends_on:
+      - server
+    command: ["tor", "-f", "/etc/tor/torrc"]
+    volumes:
+      - ./deploy/tor/torrc:/etc/tor/torrc:ro
+      - tor_data:/var/lib/tor
+    # The image's stock healthcheck assumes a SOCKS client; this container is a
+    # pure inbound hidden-service host (SocksPort 0), so check what matters:
+    # tor is running and the hidden-service hostname file exists.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -x tor >/dev/null && test -s /var/lib/tor/nanb/hostname"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      NANB_DOMAIN: ${NANB_DOMAIN:?set NANB_DOMAIN in .env}
+      NANB_UPSTREAM: "server:8080"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  tor_data:
+  caddy_data:
+  caddy_config:

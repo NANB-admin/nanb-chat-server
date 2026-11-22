@@ -1,0 +1,46 @@
+# Caddy v2 reverse proxy + automatic HTTPS for nanb-server.
+#
+# Domain and upstream come from the environment so the same file works both
+# ways:
+#   - docker-compose: the compose file sets NANB_DOMAIN and
+#     NANB_UPSTREAM=server:8080 (the server service on the compose network).
+#   - host Caddy: set NANB_DOMAIN; the upstream defaults to 127.0.0.1:8080.
+#
+# NANB_DOMAIN must be a real DNS name pointing at this machine, with ports 80
+# and 443 reachable, so Caddy can obtain a Let's Encrypt certificate.
+
+{$NANB_DOMAIN:localhost} {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+	}
+
+	# REST and WebSocket share one upstream; Caddy passes Upgrade through.
+	reverse_proxy {$NANB_UPSTREAM:127.0.0.1:8080} {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	# Access log WITHOUT anything that identifies a user or what they did: no
+	# client IPs, no request headers, no URI (paths and queries carry usernames,
+	# GIF searches and media ids). What remains (time, method, host, status,
+	# size, duration) is enough to watch errors and latency. Keep it this way.
+	log {
+		output stdout
+		format filter {
+			wrap console
+			fields {
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>headers delete
+				request>uri delete
+				request>tls delete
+				resp_headers delete
+			}
+		}
+	}
+}

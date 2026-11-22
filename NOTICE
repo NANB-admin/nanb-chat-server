@@ -1,0 +1,21 @@
+NANb Chat Server
+Copyright (C) 2026 NANb
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License, version 3 only, as
+published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along
+with this program (see the file LICENSE). If not, see
+<https://www.gnu.org/licenses/>.
+
+If you run a modified version of this server for other people, the AGPL
+(section 13) requires you to offer those users the source code of your modified
+version. A link to a public repository is enough.
+
+Third-party components and their licences are listed in
+THIRD_PARTY_LICENSES.md.
