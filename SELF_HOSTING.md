@@ -116,6 +116,18 @@ Set these in `.env`, then `docker compose up -d`.
   server hands out short-lived signed URLs. Objects are encrypted before they
   are uploaded, so the bucket never holds plaintext.
   `NANB_CDN_*` adds optional CloudFront signed URLs.
+
+  **Known limitation: media currently needs AWS S3.** The server talks to
+  Amazon's S3 only; there is no setting yet for a custom endpoint, so
+  S3-compatible services (MinIO, Cloudflare R2, Backblaze B2, Wasabi) do not
+  work today. If you are not on AWS you can still run everything else, and
+  text messages and calls work normally; sending photos, files and voice notes
+  will fail. Support for a custom endpoint is a planned improvement
+  (contributions welcome). When it lands, remember that: the endpoint must be
+  HTTPS (signed URLs are bearer links), the key should be scoped to the one
+  private bucket, and object versioning should be off so deletes are real.
+  Files are encrypted on the phone before upload, so the storage provider only
+  ever sees ciphertext, sizes and timing.
 - **Push notifications.** Create a Firebase project, download its service-account
   JSON to `secrets/firebase.json`, and set `NANB_FCM_SERVICE_ACCOUNT_PATH`. iOS
   CallKit ringing also needs an Apple push key (`NANB_APNS_*`). Note that push
